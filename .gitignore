@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# Skills & Prompts
+skills/
+prompts/
+*.skill.md
+prompt*.md
+prompt*.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Output
+output/
+logs/
+
+# Claude local settings
+.claude/settings.local.json

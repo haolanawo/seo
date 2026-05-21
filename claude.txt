@@ -1,0 +1,84 @@
+# 多平台产品推广文章生成器
+
+## 项目目标
+根据不同平台，生成多样性的产品推广文章。
+
+## 支持平台
+- 知乎
+- 小红书
+- X（Twitter）
+- Bilibili
+
+## 项目结构（规划）
+
+```
+project/
+├── config/                  # YAML 配置文件
+│   ├── diversity.yaml       # 多样性配置（人物定位/场景/论点/关键词等）
+│   └── platforms/           # 各平台 prompt 模板
+│       ├── zhihu.yaml
+│       ├── xiaohongshu.yaml
+│       ├── x.yaml
+│       └── bilibili.yaml
+├── templates/               # .md 模板文件
+├── output/                  # 生成结果，每次生成一个独立文件夹
+├── frontend/                # 本地 Web 前端页面
+├── logs/                    # 生成日志
+├── generate.py              # 拼接 prompt + 调用 API + 保存文件
+├── api.py                   # DeepSeek API 封装
+├── config_loader.py         # YAML 配置加载
+└── main.py                  # 入口（启动前端服务）
+```
+
+## Prompt 组装方式
+直接拼接，不使用占位符。最终 prompt 拼接顺序：
+
+```
+多样性prompt + 平台prompt + 模板prompt + 强调prompt（如小红书违禁词强调）
+```
+
+## 多样性配置（config/diversity.yaml）
+配置文件按类别组织，每类下有多个可选项，生成时随机抽取组合：
+- 人物定位
+- 场景
+- 论点切入角度
+- 主关键词
+- 辅助关键词
+- 产品真实信息 + 邀请码
+- 小红书违禁词列表
+
+## 平台配置（config/platforms/*.yaml）
+每个平台配置包含：
+- 平台风格描述（直接写入 prompt）
+- 小红书额外：违禁词强调（generate.py 会在 prompt 末尾再追加一次）
+
+## API 调用
+- 模型：DeepSeek V4 Pro
+- 超时：单次请求 120 秒
+- 重试：最多 3 次，指数退避（2s / 4s / 8s）
+- 并发：使用 asyncio + Semaphore，同时最多 5 个并发请求
+- generate.py 接收数量参数，一批生成 N 篇
+
+## 输出
+- 每次生成创建一个独立文件夹（位于 output/ 下），方便手动打包
+- 文件夹命名包含时间戳和平台名，便于识别
+
+## 日志
+- 记录每次生成的关键词组合、平台、时间戳、API 调用耗时、成功/失败状态
+- 日志文件存放在 logs/ 目录，按日期滚动
+
+## 本地前端页面（开发者用）
+- 技术栈待定（Flask / FastAPI + 简单 HTML，或 Streamlit / Gradio）
+- 功能：
+  - 浏览和编辑配置文件字段（YAML）
+  - 选择平台 + 生成篇数
+  - 一键生成按钮
+  - 查看生成日志
+
+## 改写 Skill
+- 维护一个改写 skill（后续实现，不在当前范围）
+- 后续可让模型优化一次中间 prompt
+
+## 不做的事项
+- 不做文章去重 / 相似度检测
+- 暂不编写测试
