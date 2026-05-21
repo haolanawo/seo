@@ -100,6 +100,41 @@ button {
   background: #fafafa;
 }
 
+/* 关键词选择 */
+.keyword-selector { }
+.kw-group { margin-bottom: 12px; }
+.kw-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+.kw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kw-chip.selected { background: #e3f2fd; border-color: #90caf9; color: #1565c0; }
+.kw-chip.deselected { background: #fafafa; border-color: #e0e0e0; color: #bbb; }
+.kw-chip input[type=checkbox] { display: none; }
+.kw-chip:hover { border-color: #90caf9; }
+
+.btn-sm {
+  padding: 4px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f9f9f9;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-sm:hover { background: #eee; }
+
 .log-list { font-size: 13px; color: #666; }
 .log-item {
   padding: 6px 0;

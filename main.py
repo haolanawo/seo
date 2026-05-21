@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from config_loader import ROOT, save_yaml
+from config_loader import ROOT, get_diversity_options, save_yaml
 from generate import generate_articles_stream
 
 app = FastAPI(title="多平台推广文章生成器")
@@ -49,7 +49,7 @@ async def index(request: Request):
         {"key": "x", "name": "X"},
         {"key": "bilibili", "name": "Bilibili"},
     ]
-    return templates.TemplateResponse("index.html", {"request": request, "platforms": platforms})
+    return templates.TemplateResponse(request, "index.html", {"platforms": platforms})
 
 
 # ==================== 配置 API ====================
@@ -76,15 +76,29 @@ async def save_platform_config(name: str, payload: dict):
     return {"status": "ok"}
 
 
+# ==================== 多样性选项 API ====================
+
+@app.get("/api/diversity/options")
+async def diversity_options():
+    """返回多样性配置的结构化选项列表，供前端渲染勾选框。"""
+    return get_diversity_options()
+
+
 # ==================== 生成 API ====================
 
-@app.get("/api/generate")
-async def generate(platform: str, count: int = 1, template: str = ""):
-    """SSE 流式生成文章，前端通过 EventSource 接收进度。"""
-    tp = template if template else None
+@app.post("/api/generate")
+async def generate(payload: dict):
+    """
+    POST 方式生成文章，返回 SSE 流。
+    body: {"platform": "zhihu", "count": 3, "template": "", "selection": {...}}
+    """
+    platform = payload.get("platform", "zhihu")
+    count = payload.get("count", 1)
+    template = payload.get("template") or None
+    selection = payload.get("selection") or None
 
     async def event_stream():
-        gen = await generate_articles_stream(platform, count, tp)
+        gen = await generate_articles_stream(platform, count, template, selection)
         async for event in gen:
             yield event
 
@@ -95,7 +109,6 @@ async def generate(platform: str, count: int = 1, template: str = ""):
 
 @app.get("/api/logs")
 async def get_logs(date: str = ""):
-    """获取指定日期的日志，默认今天。"""
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
     log_file = ROOT / "logs" / f"{date}.log"
@@ -109,7 +122,6 @@ async def get_logs(date: str = ""):
 
 @app.get("/api/templates")
 async def list_templates():
-    """列出 templates/ 目录下的 .md 文件。"""
     tp_dir = ROOT / "templates"
     if not tp_dir.exists():
         return {"templates": []}

@@ -73,7 +73,7 @@ async def generate_articles(
 
     async def generate_one(index: int):
         async with sem:
-            diversity_prompt, meta = build_diversity_prompt(diversity)
+            diversity_prompt, meta = build_diversity_prompt(diversity, selection)
             full_prompt = _assemble_prompt(diversity_prompt, platform_style, template, emphasis)
 
             t0 = time.time()
@@ -130,9 +130,11 @@ async def generate_articles_stream(
     platform: str,
     count: int,
     template_path: str | None = None,
+    selection: dict | None = None,
 ):
     """
     流式生成 —— 每完成一篇就 yield 进度事件，适用于 SSE 推送。
+    selection 为 {"persona": [...], ...}，限制每类的随机抽取范围。
     """
     import json
 
@@ -154,7 +156,7 @@ async def generate_articles_stream(
         async with sem:
             yield {"type": "progress", "index": index + 1, "status": "generating"}
 
-            diversity_prompt, meta = build_diversity_prompt(diversity)
+            diversity_prompt, meta = build_diversity_prompt(diversity, selection)
             full_prompt = _assemble_prompt(diversity_prompt, platform_style, template, emphasis)
 
             t0 = time.time()
