@@ -30,6 +30,7 @@ Thumbs.db
 # Output
 output/
 logs/
+*.zip
 
 # Claude local settings
 .claude/settings.local.json

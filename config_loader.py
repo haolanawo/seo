@@ -8,7 +8,7 @@ import yaml
 ROOT = Path(__file__).parent
 
 # 多样性配置中可随机抽取的列表类字段
-DIVERSITY_KEYS = ["persona", "scene", "angle", "main_keywords", "auxiliary_keywords"]
+DIVERSITY_KEYS = ["persona", "scene", "ai_level", "angle", "main_keywords", "auxiliary_keywords", "title_keywords"]
 
 
 def load_yaml(path: str) -> dict:
@@ -56,25 +56,31 @@ def build_diversity_prompt(diversity: dict, selection: dict | None = None) -> tu
 
     persona = _pick(diversity.get("persona", []), sel.get("persona"))
     scene = _pick(diversity.get("scene", []), sel.get("scene"))
+    ai_level = _pick(diversity.get("ai_level", []), sel.get("ai_level"))
     angle = _pick(diversity.get("angle", []), sel.get("angle"))
     main_kw = _pick(diversity.get("main_keywords", []), sel.get("main_keywords"))
     aux_kw = _pick(diversity.get("auxiliary_keywords", []), sel.get("auxiliary_keywords"))
+    title_kw = _pick(diversity.get("title_keywords", []), sel.get("title_keywords"))
     product_info = diversity.get("product_info", "")
 
     prompt = (
         f"{persona}\n\n"
+        f"{ai_level}\n\n"
         f"{scene}\n\n"
         f"{angle}\n\n"
         f"主要围绕关键词：{main_kw}\n"
-        f"辅助关键词：{aux_kw}\n\n"
+        f"辅助关键词：{aux_kw}\n"
+        f"标题需自然融入检索词：{title_kw}\n\n"
         f"【产品信息】\n{product_info}"
     )
 
     meta = {
         "persona": persona,
         "scene": scene,
+        "ai_level": ai_level,
         "angle": angle,
         "main_keyword": main_kw,
         "auxiliary_keyword": aux_kw,
+        "title_keyword": title_kw,
     }
     return prompt, meta

@@ -3,13 +3,16 @@ const CONFIG_KEYS = ["diversity", "zhihu", "xiaohongshu", "x", "bilibili"];
 const CATEGORY_LABELS = {
   persona: "人物定位",
   scene: "场景",
+  ai_level: "AI熟悉度",
   angle: "论点切入角度",
   main_keywords: "主关键词",
   auxiliary_keywords: "辅助关键词",
+  title_keywords: "标题检索词",
 };
 let currentTab = "diversity";
 let configCache = {};
 let diversityOptions = {}; // { persona: [...], scene: [...], ... }
+let lastFolderName = "";
 
 // ---- 初始化 ----
 document.addEventListener("DOMContentLoaded", () => {
@@ -18,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadLogs();
   loadTemplates();
   loadKeywordOptions();
+  loadOutputs();
 });
 
 // ==================== Tab 切换 ====================
@@ -78,12 +82,18 @@ async function saveConfig() {
   });
 
   const el = document.getElementById("config-status");
-  el.textContent = resp.ok ? "保存成功" : "保存失败";
-  el.className = `mini-status ${resp.ok ? "ok" : "err"}`;
-  el.classList.remove("hidden");
-  setTimeout(() => el.classList.add("hidden"), 2000);
-
-  if (resp.ok) loadKeywordOptions();
+  if (resp.ok) {
+    el.textContent = "保存成功";
+    el.className = "mini-status ok";
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 2000);
+    loadKeywordOptions();
+  } else {
+    const err = await resp.json().catch(() => ({}));
+    el.textContent = "保存失败: " + (err.detail || resp.statusText);
+    el.className = "mini-status err";
+    el.classList.remove("hidden");
+  }
 }
 
 // ==================== 关键词选择 ====================
@@ -183,6 +193,7 @@ async function startGenerate() {
 
   btn.disabled = true;
   btn.textContent = "生成中...";
+  document.getElementById("btn-download").classList.add("hidden");
   statusBar.classList.remove("hidden", "error");
   statusBar.textContent = "正在生成...";
   document.getElementById("log-list").innerHTML = "";
@@ -226,13 +237,21 @@ async function startGenerate() {
                 doneCount++;
                 const okFname = data.file.split("/").pop() || data.file.split("\\").pop();
 addLogItem(data.index, "ok", `完成 (${data.elapsed}s) → ${okFname}`);
+              } else if (data.status === "banned") {
+                doneCount++;
+                addLogItem(data.index, "banned", `违禁: ${data.error}`);
               } else if (data.status === "error") {
                 doneCount++;
                 addLogItem(data.index, "error", `失败: ${data.error}`);
               }
               statusBar.textContent = `进度: ${doneCount}/${count}`;
             } else if (data.type === "complete") {
-              statusBar.textContent = `生成完成！共 ${data.count} 篇，文件夹: ${data.folder}`;
+              statusBar.textContent = `生成完成！共 ${data.count} 篇`;
+              lastFolderName = data.folder_name || "";
+              const btn = document.getElementById("btn-download");
+              btn.classList.remove("hidden");
+              btn.textContent = "下载结果";
+              loadOutputs();
             }
           } catch {}
         }
@@ -274,7 +293,8 @@ async function loadLogs() {
     div.className = `log-item ${entry.status}`;
     const time = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
     const fname = entry.file ? (entry.file.split("/").pop() || entry.file.split("\\").pop()) : "";
-    div.textContent = `[${time}] #${entry.index} ${entry.status === "ok" ? "完成" : "失败"} (${entry.elapsed_s}s) ${fname} | ${entry.main_keyword}`;
+    const statusText = entry.status === "ok" ? "完成" : entry.status === "banned" ? "违禁" : "失败";
+    div.textContent = `[${time}] #${entry.index} ${statusText} (${entry.elapsed_s}s) ${fname} | ${entry.main_keyword}`;
     list.appendChild(div);
   }
 }
@@ -299,4 +319,45 @@ function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s;
   return div.innerHTML;
+}
+
+// ==================== 下载结果 ====================
+
+function downloadResult() {
+  if (!lastFolderName) return;
+  const btn = document.getElementById("btn-download");
+  btn.textContent = "打包中...";
+  btn.disabled = true;
+  window.location.href = `/api/download/${encodeURIComponent(lastFolderName)}`;
+  setTimeout(() => {
+    btn.textContent = "下载结果";
+    btn.disabled = false;
+  }, 2000);
+}
+
+function downloadFolder(folderName) {
+  window.location.href = `/api/download/${encodeURIComponent(folderName)}`;
+}
+
+// ==================== 历史输出 ====================
+
+async function loadOutputs() {
+  try {
+    const resp = await fetch("/api/outputs");
+    const data = await resp.json();
+    const list = document.getElementById("output-list");
+    if (data.folders.length === 0) {
+      list.innerHTML = "暂无输出";
+      return;
+    }
+    list.innerHTML = data.folders.map(f =>
+      `<div class="output-item">
+        <span class="output-name">${escapeHtml(f.name)}</span>
+        <span class="output-count">${f.md_count} 篇</span>
+        <button class="btn-sm btn-dl" onclick="downloadFolder('${escapeHtml(f.name)}')">下载</button>
+      </div>`
+    ).join("");
+  } catch (e) {
+    console.error("加载输出列表失败", e);
+  }
 }

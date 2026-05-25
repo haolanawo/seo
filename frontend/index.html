@@ -34,6 +34,7 @@
         <div class="field">
           <label>&nbsp;</label>
           <button id="btn-generate" onclick="startGenerate()">一键生成</button>
+          <button id="btn-download" class="hidden" onclick="downloadResult()">下载结果</button>
         </div>
       </div>
       <div id="gen-status" class="status-bar hidden"></div>
@@ -69,6 +70,15 @@
       </div>
       <textarea id="config-textarea" class="config-area" spellcheck="false"></textarea>
       <div id="config-status" class="mini-status hidden"></div>
+    </section>
+
+    <!-- 历史输出 -->
+    <section class="card output-history">
+      <div class="section-header">
+        <h3>历史输出</h3>
+        <button id="btn-refresh-outputs" onclick="loadOutputs()">刷新</button>
+      </div>
+      <div id="output-list" class="output-list">暂无输出</div>
     </section>
 
     <!-- 日志 -->

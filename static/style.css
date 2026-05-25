@@ -42,6 +42,10 @@ button {
 #btn-generate { background: #1a73e8; color: #fff; }
 #btn-generate:hover { background: #1557b0; }
 #btn-generate:disabled { background: #93b8f0; cursor: not-allowed; }
+#btn-download { background: #0d904f; color: #fff; }
+#btn-download:hover { background: #0a753f; }
+#btn-download:disabled { background: #8fc9a8; cursor: not-allowed; }
+#btn-download.hidden { display: none; }
 #btn-save { background: #0d904f; color: #fff; }
 #btn-save:hover { background: #0a753f; }
 #btn-reload, #btn-refresh-logs { background: #eee; color: #333; }
@@ -135,6 +139,24 @@ button {
 }
 .btn-sm:hover { background: #eee; }
 
+.output-list { font-size: 13px; color: #666; }
+.output-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.output-name { flex: 1; font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.output-count { color: #999; font-size: 12px; white-space: nowrap; }
+.btn-dl {
+  background: #0d904f;
+  color: #fff;
+  border: none;
+  white-space: nowrap;
+}
+.btn-dl:hover { background: #0a753f; }
+
 .log-list { font-size: 13px; color: #666; }
 .log-item {
   padding: 6px 0;
@@ -145,3 +167,4 @@ button {
 .log-item.ok { color: #2e7d32; }
 .log-item.error { color: #c62828; }
 .log-item.generating { color: #e67e22; }
+.log-item.banned { color: #9c27b0; }

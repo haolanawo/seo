@@ -15,6 +15,13 @@ OUTPUT_ROOT = ROOT / "output"
 LOG_ROOT = ROOT / "logs"
 
 
+def check_banned_words(text: str, forbidden_words: list[str]) -> list[str]:
+    """检查文本中是否包含违禁词，返回命中列表。"""
+    if not text or not forbidden_words:
+        return []
+    return [w for w in forbidden_words if w in text]
+
+
 def _load_template(template_path: str | None) -> str:
     """加载 .md 模板文件内容。"""
     if not template_path:
@@ -33,7 +40,10 @@ def _assemble_prompt(
     emphasis: str,
 ) -> str:
     """按顺序拼接最终 prompt。"""
-    parts = [diversity_prompt, platform_style, template, emphasis]
+    parts = [diversity_prompt, platform_style]
+    if template:
+        parts.append(f"【参考模板】请模仿以下文章的格式、语气和排版风格来写作（内容主题以我的产品信息为准）：\n\n{template}")
+    parts.append(emphasis)
     return "\n\n---\n\n".join(p for p in parts if p)
 
 
@@ -73,7 +83,7 @@ async def generate_articles(
 
     async def generate_one(index: int):
         async with sem:
-            diversity_prompt, meta = build_diversity_prompt(diversity, selection)
+            diversity_prompt, meta = build_diversity_prompt(diversity)
             full_prompt = _assemble_prompt(diversity_prompt, platform_style, template, emphasis)
 
             t0 = time.time()
@@ -88,22 +98,19 @@ async def generate_articles(
 
             elapsed = round(time.time() - t0, 2)
 
-            # 保存文章
+            # 违禁词检测
+            banned_found: list[str] = []
+            if content and status == "ok":
+                banned_found = check_banned_words(content, diversity.get("forbidden_words", []))
+                if banned_found:
+                    status = "banned"
+                    error_msg = f"违禁词: {', '.join(banned_found)}"
+
+            # 保存文章（纯模型输出）
             filename = f"{index + 1:03d}.md"
             filepath = folder / filename
-            header = (
-                f"# 生成 #{index + 1}\n"
-                f"平台: {platform_cfg.get('name', platform)}\n"
-                f"人物定位: {meta['persona']}\n"
-                f"场景: {meta['scene']}\n"
-                f"论点切入: {meta['angle']}\n"
-                f"主关键词: {meta['main_keyword']}\n"
-                f"辅助关键词: {meta['auxiliary_keyword']}\n"
-                f"生成时间: {datetime.now().isoformat()}\n"
-                f"状态: {status}\n\n"
-                "---\n\n"
-            )
-            filepath.write_text(header + content, encoding="utf-8")
+            filepath.write_text(content, encoding="utf-8")
+            (folder / f"{index + 1:03d}_prompt.md").write_text(full_prompt, encoding="utf-8")
 
             # 日志
             log_entry = {
@@ -114,6 +121,7 @@ async def generate_articles(
                 "elapsed_s": elapsed,
                 "main_keyword": meta["main_keyword"],
                 "auxiliary_keyword": meta["auxiliary_keyword"],
+                "title_keyword": meta["title_keyword"],
                 "error": error_msg,
                 "file": str(filepath),
             }
@@ -171,22 +179,19 @@ async def generate_articles_stream(
 
             elapsed = round(time.time() - t0, 2)
 
-            # 保存文章
+            # 违禁词检测
+            banned_found: list[str] = []
+            if content and status == "ok":
+                banned_found = check_banned_words(content, diversity.get("forbidden_words", []))
+                if banned_found:
+                    status = "banned"
+                    error_msg = f"违禁词: {', '.join(banned_found)}"
+
+            # 保存文章（纯模型输出）
             filename = f"{index + 1:03d}.md"
             filepath = folder / filename
-            header = (
-                f"# 生成 #{index + 1}\n"
-                f"平台: {platform_cfg.get('name', platform)}\n"
-                f"人物定位: {meta['persona']}\n"
-                f"场景: {meta['scene']}\n"
-                f"论点切入: {meta['angle']}\n"
-                f"主关键词: {meta['main_keyword']}\n"
-                f"辅助关键词: {meta['auxiliary_keyword']}\n"
-                f"生成时间: {datetime.now().isoformat()}\n"
-                f"状态: {status}\n\n"
-                "---\n\n"
-            )
-            filepath.write_text(header + content, encoding="utf-8")
+            filepath.write_text(content, encoding="utf-8")
+            (folder / f"{index + 1:03d}_prompt.md").write_text(full_prompt, encoding="utf-8")
 
             # 日志
             log_entry = {
@@ -197,6 +202,7 @@ async def generate_articles_stream(
                 "elapsed_s": elapsed,
                 "main_keyword": meta["main_keyword"],
                 "auxiliary_keyword": meta["auxiliary_keyword"],
+                "title_keyword": meta["title_keyword"],
                 "error": error_msg,
                 "file": str(filepath),
             }
@@ -225,12 +231,12 @@ async def generate_articles_stream(
         done = 0
         while done < count:
             event = await queue.get()
-            if event["type"] == "progress" and event.get("status") in ("ok", "error"):
+            if event["type"] == "progress" and event.get("status") in ("ok", "error", "banned"):
                 done += 1
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
         await asyncio.gather(*worker_tasks)
 
-        yield f"data: {json.dumps({'type': 'complete', 'folder': str(folder), 'count': count}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'complete', 'folder': str(folder), 'folder_name': folder.name, 'count': count}, ensure_ascii=False)}\n\n"
 
     return run_all()

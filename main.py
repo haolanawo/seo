@@ -1,6 +1,9 @@
 """FastAPI 主入口 —— 本地 Web 前端 + API 路由。"""
 
+import io
 import json
+import os
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +13,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from config_loader import ROOT, get_diversity_options, save_yaml
+from config_loader import ROOT, get_diversity_options
 from generate import generate_articles_stream
 
 app = FastAPI(title="多平台推广文章生成器")
@@ -33,10 +36,16 @@ def _read_raw(path: str) -> str:
 
 
 def _save_yaml_text(path: str, yaml_text: str) -> None:
-    data = yaml.safe_load(yaml_text)
+    # 先验证 YAML 是否可以解析
+    try:
+        data = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as e:
+        raise HTTPException(400, f"YAML 解析失败: {e}")
     if data is None:
-        raise HTTPException(400, "YAML 解析失败：内容为空或格式错误")
-    save_yaml(path, data)
+        raise HTTPException(400, "YAML 解析失败：内容为空")
+    # 验证通过，直接写入原始文本，保留用户的格式和注释
+    full = ROOT / path
+    full.write_text(yaml_text, encoding="utf-8")
 
 
 # ==================== 页面 ====================
@@ -129,12 +138,60 @@ async def list_templates():
     return {"templates": [f"templates/{f.name}" for f in files]}
 
 
+# ==================== 输出列表 API ====================
+
+@app.get("/api/outputs")
+async def list_outputs():
+    """列出 output 下所有文件夹，按时间倒序，供历史下载。"""
+    output_dir = ROOT / "output"
+    if not output_dir.exists():
+        return {"folders": []}
+    folders = []
+    for d in sorted(output_dir.iterdir(), reverse=True):
+        if d.is_dir():
+            files = list(d.glob("*.md"))
+            md_count = sum(1 for f in files if not f.name.endswith("_prompt.md"))
+            folders.append({
+                "name": d.name,
+                "md_count": md_count,
+            })
+    return {"folders": folders}
+
+
+# ==================== 下载 API ====================
+
+@app.get("/api/download/{folder_name}")
+async def download_folder(folder_name: str):
+    """将 output 下的指定文件夹打包为 zip 下载。"""
+    output_dir = (ROOT / "output").resolve()
+    folder = (ROOT / "output" / folder_name).resolve()
+    # 防止路径穿越攻击
+    if not str(folder).startswith(str(output_dir)):
+        raise HTTPException(403, "禁止访问")
+    if not folder.exists() or not folder.is_dir():
+        raise HTTPException(404, "文件夹不存在")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(folder.iterdir()):
+            if f.is_file():
+                zf.write(f, f.name)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{folder_name}.zip"'},
+    )
+
+
 # ==================== 启动入口 ====================
 
 def main():
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8080"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 
 
 if __name__ == "__main__":
