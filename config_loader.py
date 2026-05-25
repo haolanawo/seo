@@ -39,18 +39,29 @@ def get_diversity_options() -> dict[str, list[str]]:
 
 
 def _pick(items: list[str], selection: list[str] | None) -> str:
-    """从 items 中随机抽取。若 selection 非空则限制范围。"""
-    pool = selection if selection else items
+    """从 items 中随机抽取。selection=None 表示不限范围，[] 表示用户全不选。"""
+    if selection is None:
+        pool = items
+    elif not selection:
+        return ""
+    else:
+        pool = selection
     if not pool:
         return ""
     return random.choice(pool)
+
+
+def _all_empty(*values: str) -> bool:
+    """所有值都为空字符串时返回 True。"""
+    return not any(v for v in values)
 
 
 def build_diversity_prompt(diversity: dict, selection: dict | None = None) -> tuple[str, dict]:
     """
     随机抽取多样性配置拼成 prompt。
     selection 为 {"persona": [...], "scene": [...], ...}，限制每类的抽取范围。
-    若 selection 缺失或某 key 为空，则从全部候选中抽取。
+    selection=None 表示不限范围，selection={"persona": [], ...} 表示用户全不选。
+    若所有类别都被用户清空，则不生成多样性 prompt。
     """
     sel = selection or {}
 
@@ -61,8 +72,21 @@ def build_diversity_prompt(diversity: dict, selection: dict | None = None) -> tu
     main_kw = _pick(diversity.get("main_keywords", []), sel.get("main_keywords"))
     aux_kw = _pick(diversity.get("auxiliary_keywords", []), sel.get("auxiliary_keywords"))
     title_kw = _pick(diversity.get("title_keywords", []), sel.get("title_keywords"))
-    product_info = diversity.get("product_info", "")
 
+    meta = {
+        "persona": persona,
+        "scene": scene,
+        "ai_level": ai_level,
+        "angle": angle,
+        "main_keyword": main_kw,
+        "auxiliary_keyword": aux_kw,
+        "title_keyword": title_kw,
+    }
+
+    if _all_empty(persona, scene, ai_level, angle, main_kw, aux_kw, title_kw):
+        return "", meta
+
+    product_info = diversity.get("product_info", "")
     prompt = (
         f"{persona}\n\n"
         f"{ai_level}\n\n"
@@ -74,13 +98,4 @@ def build_diversity_prompt(diversity: dict, selection: dict | None = None) -> tu
         f"【产品信息】\n{product_info}"
     )
 
-    meta = {
-        "persona": persona,
-        "scene": scene,
-        "ai_level": ai_level,
-        "angle": angle,
-        "main_keyword": main_kw,
-        "auxiliary_keyword": aux_kw,
-        "title_keyword": title_kw,
-    }
     return prompt, meta
